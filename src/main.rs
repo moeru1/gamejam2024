@@ -4,23 +4,21 @@
 // Feel free to delete this line.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
-
-mod plugin;
 mod background;
 mod constants;
+mod plugin;
 
+use background::*;
 use bevy::asset;
 use bevy::audio::PlaybackMode;
+use bevy::core_pipeline::clear_color::ClearColorConfig;
+use bevy::gltf::Gltf;
 use bevy::{prelude::*, render::camera::ScalingMode};
 use bevy::{prelude::*, transform::TransformSystem};
 use bevy_xpbd_3d::{math::*, prelude::*, SubstepSchedule, SubstepSet};
 use plugin::*;
-use background::*;
-use rand::Rng;
 use rand::distributions::{Distribution, Uniform};
-use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::gltf::Gltf;
-
+use rand::Rng;
 
 #[derive(Resource)]
 struct BackgroundImg(Handle<Image>);
@@ -34,7 +32,7 @@ struct PlayerModel(Handle<Scene>);
 #[derive(Resource)]
 struct EnemyModel {
     rojo: Handle<Scene>,
-    amarillo: Handle<Scene>
+    amarillo: Handle<Scene>,
 }
 
 #[derive(Resource)]
@@ -49,7 +47,6 @@ struct AssetPackEnemy {
 #[derive(Resource)]
 struct OST(Handle<AudioSource>);
 
-
 #[derive(Component)]
 struct Player;
 
@@ -58,13 +55,12 @@ enum Enemy {
     FrijolRojo,
     FrijolAmarillo,
     Other,
-}    
+}
 
 #[derive(Resource)]
 pub struct SecondTimer(Timer);
 
-
-impl SecondTimer{
+impl SecondTimer {
     pub fn new() -> Self {
         Self(Timer::from_seconds(1., TimerMode::Repeating))
     }
@@ -98,7 +94,7 @@ fn main() {
             PhysicsPlugins::default(),
             CharacterControllerPlugin,
         ))
-//        .add_plugins(EditorPlugin::default())
+        //        .add_plugins(EditorPlugin::default())
         .init_resource::<SecondTimer>()
         .add_systems(Startup, (load_assets, play_ost))
         .add_systems(
@@ -108,17 +104,14 @@ fn main() {
                 load_gltf_player.run_if(in_state(GameState::AssetLoading)),
                 check_if_loaded.run_if(in_state(GameState::AssetLoading)),
             )
-                .chain()
+                .chain(),
         )
         .add_systems(
-            OnEnter(GameState::InGame), 
-            (
-                background_setup.before(setup),
-                setup
-            )
+            OnEnter(GameState::InGame),
+            (background_setup.before(setup), setup),
         )
         .add_systems(
-            Update, 
+            Update,
             (
                 setup_scene_once_loaded.run_if(in_state(GameState::InGame)),
                 countdown.run_if(in_state(GameState::InGame)),
@@ -126,28 +119,23 @@ fn main() {
                 print_collisions.run_if(in_state(GameState::InGame)),
                 move_background.run_if(in_state(GameState::InGame)),
                 despawn_nonvisible_enemies.run_if(in_state(GameState::InGame)),
-            )
+            ),
         )
         .run();
 }
 
-fn load_assets(
-    mut commands: Commands, 
-    server: Res<AssetServer>,
-) {
+fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
     let run: Handle<Gltf> = server.load("run.glb");
     let amarillo: Handle<Gltf> = server.load("frijol_amarillo.glb");
     let rojo: Handle<Gltf> = server.load("frijol_rojo.glb");
     let background: Handle<Image> = server.load("Background.png");
     commands.insert_resource(AssetPackPlayer(run));
-    commands.insert_resource(AssetPackEnemy{ rojo, amarillo } );
+    commands.insert_resource(AssetPackEnemy { rojo, amarillo });
     commands.insert_resource(BackgroundImg(background));
 }
 
-
-
 fn load_gltf_player(
-    mut commands: Commands, 
+    mut commands: Commands,
     my: Res<AssetPackPlayer>,
     assets_gltf: Res<Assets<Gltf>>,
 ) {
@@ -184,12 +172,11 @@ fn check_if_loaded(
     let enemy_loaded = assets_gltf.get(&enemy.rojo).is_some();
     let image_loaded = assets_img.get(&background.0).is_some();
     let enemy_loaded = enemy_loaded && assets_gltf.get(&enemy.amarillo).is_some();
-    
+
     if player_loaded && enemy_loaded && image_loaded {
         next_state.set(GameState::InGame);
     }
 }
-
 
 fn setup(
     mut commands: Commands,
@@ -217,7 +204,9 @@ fn setup(
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane::from_size(constants::WIDTH))),
             material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-            transform: Transform::from_translation(Vec3::NEG_Y * constants::HALF_HEIGHT - (1.0 * Vec3::Y)),
+            transform: Transform::from_translation(
+                Vec3::NEG_Y * constants::HALF_HEIGHT - (1.0 * Vec3::Y),
+            ),
             visibility: Visibility::Hidden,
             ..default()
         },
@@ -237,31 +226,30 @@ fn setup(
         ..default()
     });
 
-    commands.spawn(
-        Camera3dBundle {
-            projection: OrthographicProjection {
-                scaling_mode: ScalingMode::Fixed {width: 16., height: 9. },
-                ..default()
-            }
-            .into(),
-            camera_3d: Camera3d {
-                // don't clear the color while rendering this camera
-                clear_color: ClearColorConfig::None,
-                ..default()
+    commands.spawn(Camera3dBundle {
+        projection: OrthographicProjection {
+            scaling_mode: ScalingMode::Fixed {
+                width: 16.,
+                height: 9.,
             },
-            transform: Transform::from_xyz(0.0, 3.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+            ..default()
+        }
+        .into(),
+        camera_3d: Camera3d {
+            // don't clear the color while rendering this camera
+            clear_color: ClearColorConfig::None,
+            ..default()
+        },
+        transform: Transform::from_xyz(0.0, 3.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
-
 }
 
 //https://bevyengine.org/examples/3D%20Rendering/3d-viewport-to-world/
-fn top_screen_to_world(
-    camera_query: Query<(&Camera, &GlobalTransform)>,
-    ) -> Vec3 {
+fn top_screen_to_world(camera_query: Query<(&Camera, &GlobalTransform)>) -> Vec3 {
     let (camera, camera_transform) = camera_query.single();
-        // Calculate a ray pointing from the camera into the world based on the cursor's position.
-    let Some(ray) = camera.viewport_to_world(camera_transform, Vec2::new(0.,0.)) else {
+    // Calculate a ray pointing from the camera into the world based on the cursor's position.
+    let Some(ray) = camera.viewport_to_world(camera_transform, Vec2::new(0., 0.)) else {
         panic!("Could not obtain viewport_to_world");
     };
 
@@ -274,10 +262,7 @@ fn top_screen_to_world(
     point
 }
 
-fn countdown(
-    time: Res<Time>,
-    mut second_timer: ResMut<SecondTimer>
-) {
+fn countdown(time: Res<Time>, mut second_timer: ResMut<SecondTimer>) {
     second_timer.0.tick(time.delta());
 }
 
@@ -292,7 +277,14 @@ fn spawn_random_enemy(
         let dist = Uniform::new(constants::MIN_X, constants::MAX_X);
         let x: f32 = rand::thread_rng().sample(dist);
         let pos = Transform::from_xyz(x, 5., 0.);
-        spawn_enemy(commands, meshes, materials, enemy_scene, Enemy::FrijolAmarillo, pos);
+        spawn_enemy(
+            commands,
+            meshes,
+            materials,
+            enemy_scene,
+            Enemy::FrijolAmarillo,
+            pos,
+        );
     }
 }
 
@@ -300,13 +292,12 @@ fn spawn_enemy(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    enemy_scene : Res<EnemyModel>,
+    enemy_scene: Res<EnemyModel>,
     enemy: Enemy,
     transform: Transform,
 ) {
     match enemy {
-        Enemy::FrijolAmarillo => {
-        commands.spawn((
+        Enemy::FrijolAmarillo => commands.spawn((
             RigidBody::Dynamic,
             Collider::capsule(0.05, 0.05),
             LinearVelocity(Vec3::new(-1., 0., 0.)),
@@ -316,14 +307,14 @@ fn spawn_enemy(
                 transform,
                 ..default()
             },
-        ))},
-        _ => unimplemented!()
+        )),
+        _ => unimplemented!(),
     };
 }
 
 fn despawn_nonvisible_enemies(
     mut commands: Commands,
-    enemies: Query<(Entity, &ViewVisibility), With<Enemy>>
+    enemies: Query<(Entity, &ViewVisibility), With<Enemy>>,
 ) {
     for (entity, visibility) in &enemies {
         if !visibility.get() {
@@ -335,8 +326,8 @@ fn despawn_nonvisible_enemies(
 fn print_collisions(
     mut collision_event_reader: EventReader<Collision>,
     mut commands: Commands,
-    enemy_query: Query<Entity, With<Enemy>>
-    ) {
+    enemy_query: Query<Entity, With<Enemy>>,
+) {
     for Collision(contacts) in collision_event_reader.read() {
         for &entity in [contacts.entity1, contacts.entity2].iter() {
             if let Ok(enemy) = enemy_query.get(entity) {
@@ -345,7 +336,6 @@ fn print_collisions(
         }
     }
 }
-
 
 // Once the scene is loaded, start the animation
 fn setup_scene_once_loaded(
@@ -357,16 +347,12 @@ fn setup_scene_once_loaded(
     }
 }
 
-fn play_ost(
-    asset_server: Res<AssetServer>,
-    mut commands: Commands,
-) {
+fn play_ost(asset_server: Res<AssetServer>, mut commands: Commands) {
     commands.spawn(AudioBundle {
         source: asset_server.load("ost.wav"),
-        settings: PlaybackSettings { 
-            mode: PlaybackMode::Loop, 
+        settings: PlaybackSettings {
+            mode: PlaybackMode::Loop,
             ..default()
         },
     });
 }
-
