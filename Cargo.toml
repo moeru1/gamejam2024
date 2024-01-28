@@ -1,0 +1,22 @@
+[package]
+name = "Gamejam2024"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0 OR CC0-1.0"
+
+# Compile with Performance Optimizations:
+# https://bevyengine.org/learn/book/getting-started/setup/#compile-with-performance-optimizations
+
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+[dependencies]
+bevy = { version = "0.12.1", features = ["jpeg", "wav"] }
+bevy_xpbd_3d = { git = "https://github.com/Jondolf/bevy_xpbd", branch = "main" }
+rand = "0.8.5"
+itertools = "0.12.0"
