@@ -90,6 +90,7 @@ enum Layer {
 
 fn main() {
     App::new()
+        .insert_resource(bevy::asset::AssetMetaCheck::Never)
         .add_state::<GameState>()
         .add_plugins((
             DefaultPlugins.set(WindowPlugin {
