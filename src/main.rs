@@ -9,13 +9,13 @@ mod constants;
 mod plugin;
 
 use background::*;
-use bevy::asset;
+
 use bevy::audio::PlaybackMode;
 use bevy::core_pipeline::clear_color::ClearColorConfig;
 use bevy::gltf::Gltf;
 use bevy::{prelude::*, render::camera::ScalingMode};
-use bevy::{prelude::*, transform::TransformSystem};
-use bevy_xpbd_3d::{math::*, prelude::*, SubstepSchedule, SubstepSet};
+
+use bevy_xpbd_3d::{math::*, prelude::*};
 use plugin::*;
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
@@ -116,7 +116,7 @@ fn main() {
                 setup_scene_once_loaded.run_if(in_state(GameState::InGame)),
                 countdown.run_if(in_state(GameState::InGame)),
                 spawn_random_enemy.run_if(in_state(GameState::InGame)),
-                print_collisions.run_if(in_state(GameState::InGame)),
+                handle_collisions.run_if(in_state(GameState::InGame)),
                 move_background.run_if(in_state(GameState::InGame)),
                 despawn_nonvisible_enemies.run_if(in_state(GameState::InGame)),
             ),
@@ -200,6 +200,7 @@ fn setup(
         Player,
     ));
 
+    //bottom
     commands.spawn((
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane::from_size(constants::WIDTH))),
@@ -213,6 +214,47 @@ fn setup(
         RigidBody::Static,
         Collider::cuboid(constants::WIDTH, 0.002, 8.0),
     ));
+
+
+    let mut transform = Transform::from_translation(
+        Vec3::NEG_X * constants::HALF_WIDTH + (0.5 * Vec3::X)
+    );
+    transform.rotate_z(PI / 2.0);
+
+    //left
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane::from_size(constants::WIDTH))),
+            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+            transform,
+            visibility: Visibility::Hidden,
+            ..default()
+        },
+        RigidBody::Static,
+        Collider::cuboid(constants::HEIGHT, 0.002, 8.0),
+    ));
+
+    let mut transform = Transform::from_translation(
+        Vec3::X * constants::HALF_WIDTH - (0.5 * Vec3::X)
+    );
+    transform.rotate_z(PI / 2.0);
+
+    //right
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane::from_size(constants::WIDTH))),
+            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+            transform,
+            visibility: Visibility::Hidden,
+            ..default()
+        },
+        RigidBody::Static,
+        Collider::cuboid(constants::HEIGHT, 0.002, 8.0),
+    ));
+
+
+
+
 
     // Light
     commands.spawn(PointLightBundle {
@@ -290,8 +332,8 @@ fn spawn_random_enemy(
 
 fn spawn_enemy(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    _meshes: ResMut<Assets<Mesh>>,
+    _materials: ResMut<Assets<StandardMaterial>>,
     enemy_scene: Res<EnemyModel>,
     enemy: Enemy,
     transform: Transform,
@@ -323,17 +365,22 @@ fn despawn_nonvisible_enemies(
     }
 }
 
-fn print_collisions(
+fn handle_collisions(
     mut collision_event_reader: EventReader<Collision>,
     mut commands: Commands,
     enemy_query: Query<Entity, With<Enemy>>,
+    player_query: Query<Entity, With<Player>>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     for Collision(contacts) in collision_event_reader.read() {
-        for &entity in [contacts.entity1, contacts.entity2].iter() {
-            if let Ok(enemy) = enemy_query.get(entity) {
-                commands.entity(enemy).despawn_recursive();
-            }
+        let entities = [contacts.entity1, contacts.entity2];
+        let enemy = entities.iter().filter_map(|&e| enemy_query.get(e).ok());
+        let player = entities.iter().filter_map(|&e| player_query.get(e).ok());
+        for (enemy, _) in enemy.zip(player) {
+            commands.entity(enemy).despawn_recursive();
+            next_state.set(GameState::Menu);
         }
+        
     }
 }
 

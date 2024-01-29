@@ -41,8 +41,7 @@ pub fn background_setup(mut commands: Commands, images: Res<BackgroundImg>) {
                 height: constants::HEIGHT,
             },
             ..default()
-        }
-        .into(),
+        },
         camera: Camera {
             // renders after / on top of the main camera
             order: -1,
