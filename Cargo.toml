@@ -16,7 +16,8 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-bevy = { version = "0.12.1", features = ["jpeg", "wav"] }
+bevy = { version = "0.12.1", features = ["jpeg", "flac"] }
 bevy_xpbd_3d = { git = "https://github.com/Jondolf/bevy_xpbd", branch = "main" }
 rand = "0.8.5"
 itertools = "0.12.0"
+bevy_egui = "0.24.0"

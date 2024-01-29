@@ -6,9 +6,12 @@
 
 mod background;
 mod constants;
+mod hud;
 mod plugin;
 
 use background::*;
+use hud::*;
+use plugin::*;
 
 use bevy::audio::PlaybackMode;
 use bevy::core_pipeline::clear_color::ClearColorConfig;
@@ -16,7 +19,6 @@ use bevy::gltf::Gltf;
 use bevy::{prelude::*, render::camera::ScalingMode};
 
 use bevy_xpbd_3d::{math::*, prelude::*};
-use plugin::*;
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
 
@@ -79,6 +81,13 @@ enum GameState {
     Menu,
 }
 
+#[derive(PhysicsLayer)]
+enum Layer {
+    Player,
+    Enemy,
+    Ground,
+}
+
 fn main() {
     App::new()
         .add_state::<GameState>()
@@ -91,6 +100,7 @@ fn main() {
                 }),
                 ..default()
             }),
+            HudPlugin,
             PhysicsPlugins::default(),
             CharacterControllerPlugin,
         ))
@@ -116,6 +126,7 @@ fn main() {
                 setup_scene_once_loaded.run_if(in_state(GameState::InGame)),
                 countdown.run_if(in_state(GameState::InGame)),
                 spawn_random_enemy.run_if(in_state(GameState::InGame)),
+                update_score.run_if(in_state(GameState::InGame)),
                 handle_collisions.run_if(in_state(GameState::InGame)),
                 move_background.run_if(in_state(GameState::InGame)),
                 despawn_nonvisible_enemies.run_if(in_state(GameState::InGame)),
@@ -197,6 +208,7 @@ fn setup(
         },
         CharacterControllerBundle::new(Collider::capsule(2.0, 0.5), Vector::NEG_Y * 9.81 * 2.0)
             .with_movement(30.0, 0.92, 12.0, (30.0 as Scalar).to_radians()),
+        CollisionLayers::new([Layer::Player], [Layer::Enemy, Layer::Ground]),
         Player,
     ));
 
@@ -213,12 +225,11 @@ fn setup(
         },
         RigidBody::Static,
         Collider::cuboid(constants::WIDTH, 0.002, 8.0),
+        CollisionLayers::new([Layer::Ground], [Layer::Player]),
     ));
 
-
-    let mut transform = Transform::from_translation(
-        Vec3::NEG_X * constants::HALF_WIDTH + (0.5 * Vec3::X)
-    );
+    let mut transform =
+        Transform::from_translation(Vec3::NEG_X * constants::HALF_WIDTH + (0.5 * Vec3::X));
     transform.rotate_z(PI / 2.0);
 
     //left
@@ -232,11 +243,11 @@ fn setup(
         },
         RigidBody::Static,
         Collider::cuboid(constants::HEIGHT, 0.002, 8.0),
+        CollisionLayers::new([Layer::Ground], [Layer::Player]),
     ));
 
-    let mut transform = Transform::from_translation(
-        Vec3::X * constants::HALF_WIDTH - (0.5 * Vec3::X)
-    );
+    let mut transform =
+        Transform::from_translation(Vec3::X * constants::HALF_WIDTH - (0.5 * Vec3::X));
     transform.rotate_z(PI / 2.0);
 
     //right
@@ -250,11 +261,8 @@ fn setup(
         },
         RigidBody::Static,
         Collider::cuboid(constants::HEIGHT, 0.002, 8.0),
+        CollisionLayers::new([Layer::Ground], [Layer::Player]),
     ));
-
-
-
-
 
     // Light
     commands.spawn(PointLightBundle {
@@ -330,6 +338,12 @@ fn spawn_random_enemy(
     }
 }
 
+fn update_score(mut score: ResMut<Score>, second_timer: Res<SecondTimer>) {
+    if second_timer.0.just_finished() {
+        score.0 += 10;
+    }
+}
+
 fn spawn_enemy(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
@@ -342,6 +356,7 @@ fn spawn_enemy(
         Enemy::FrijolAmarillo => commands.spawn((
             RigidBody::Dynamic,
             Collider::capsule(0.05, 0.05),
+            CollisionLayers::new([Layer::Enemy], [Layer::Player]),
             LinearVelocity(Vec3::new(-1., 0., 0.)),
             Enemy::FrijolRojo,
             SceneBundle {
@@ -380,7 +395,6 @@ fn handle_collisions(
             commands.entity(enemy).despawn_recursive();
             next_state.set(GameState::Menu);
         }
-        
     }
 }
 
@@ -396,7 +410,7 @@ fn setup_scene_once_loaded(
 
 fn play_ost(asset_server: Res<AssetServer>, mut commands: Commands) {
     commands.spawn(AudioBundle {
-        source: asset_server.load("ost.wav"),
+        source: asset_server.load("ost.flac"),
         settings: PlaybackSettings {
             mode: PlaybackMode::Loop,
             ..default()
