@@ -5,12 +5,14 @@
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 mod assets;
+mod audio;
 mod background;
 mod constants;
 mod hud;
 mod plugin;
 
 pub use assets::*;
+use audio::*;
 use background::*;
 use hud::*;
 use plugin::*;
@@ -35,6 +37,9 @@ enum Enemy {
 
 #[derive(Resource)]
 pub struct SecondTimer(Timer);
+
+#[derive(Resource)]
+pub struct OST(pub Handle<AudioSource>);
 
 impl SecondTimer {
     pub fn new() -> Self {
@@ -79,11 +84,11 @@ fn main() {
             CharacterControllerPlugin,
             HudPlugin,
             AssetLoaderPlugin,
-            BackgroundPlugin
-            ))
+            BackgroundPlugin,
+        ))
         //        .add_plugins(EditorPlugin::default())
         .init_resource::<SecondTimer>()
-        .add_systems(OnExit(GameState::AssetLoading), add_background)
+        .add_systems(OnExit(GameState::AssetLoading), (add_background, add_ost))
         .add_systems(
             OnEnter(GameState::InGame),
             (setup, play_ost.after(background_setup)),
@@ -321,16 +326,10 @@ fn setup_scene_once_loaded(
     }
 }
 
-fn play_ost(ost: Res<OST>, mut commands: Commands) {
-    commands.spawn(AudioBundle {
-        source: ost.0.clone(),
-        settings: PlaybackSettings {
-            mode: PlaybackMode::Loop,
-            ..default()
-        },
-    });
-}
-
 fn add_background(mut commands: Commands, asset_background: Res<AssetBackground>) {
     commands.insert_resource(BackgroundImg(asset_background.0.clone()));
+}
+
+fn add_ost(mut commands: Commands, asset_ost: Res<AssetOST>) {
+    commands.insert_resource(OST(asset_ost.0.clone()));
 }

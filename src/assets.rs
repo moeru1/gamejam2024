@@ -27,7 +27,7 @@ struct AssetPackEnemy {
 }
 
 #[derive(Resource)]
-pub struct OST(pub Handle<AudioSource>);
+pub struct AssetOST(pub Handle<AudioSource>);
 
 pub struct AssetLoaderPlugin;
 
@@ -56,7 +56,7 @@ fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
     commands.insert_resource(AssetPackPlayer(run));
     commands.insert_resource(AssetPackEnemy { rojo, amarillo });
     commands.insert_resource(AssetBackground(background));
-    commands.insert_resource(OST(ost));
+    commands.insert_resource(AssetOST(ost));
 }
 
 fn load_gltf_player(
@@ -89,7 +89,7 @@ fn check_if_loaded(
     player: Res<AssetPackPlayer>,
     enemy: Res<AssetPackEnemy>,
     background: Res<AssetBackground>,
-    ost: Res<OST>,
+    ost: Res<AssetOST>,
     assets_gltf: Res<Assets<Gltf>>,
     assets_img: Res<Assets<Image>>,
     assets_audio: Res<Assets<AudioSource>>,
