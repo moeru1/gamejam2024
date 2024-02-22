@@ -4,50 +4,26 @@
 // Feel free to delete this line.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
+mod assets;
+mod audio;
 mod background;
 mod constants;
 mod hud;
 mod plugin;
 
+pub use assets::*;
+use audio::*;
 use background::*;
 use hud::*;
 use plugin::*;
 
 use bevy::audio::PlaybackMode;
 use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::gltf::Gltf;
 use bevy::{prelude::*, render::camera::ScalingMode};
 
 use bevy_xpbd_3d::{math::*, prelude::*};
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
-
-#[derive(Resource)]
-struct BackgroundImg(Handle<Image>);
-
-#[derive(Resource)]
-struct Animations(Vec<Handle<AnimationClip>>);
-
-#[derive(Resource)]
-struct PlayerModel(Handle<Scene>);
-
-#[derive(Resource)]
-struct EnemyModel {
-    rojo: Handle<Scene>,
-    amarillo: Handle<Scene>,
-}
-
-#[derive(Resource)]
-struct AssetPackPlayer(Handle<Gltf>);
-
-#[derive(Resource)]
-struct AssetPackEnemy {
-    rojo: Handle<Gltf>,
-    amarillo: Handle<Gltf>,
-}
-
-#[derive(Resource)]
-struct OST(Handle<AudioSource>);
 
 #[derive(Component)]
 struct Player;
@@ -61,6 +37,9 @@ enum Enemy {
 
 #[derive(Resource)]
 pub struct SecondTimer(Timer);
+
+#[derive(Resource)]
+pub struct OST(pub Handle<AudioSource>);
 
 impl SecondTimer {
     pub fn new() -> Self {
@@ -101,25 +80,18 @@ fn main() {
                 }),
                 ..default()
             }),
-            HudPlugin,
             PhysicsPlugins::default(),
             CharacterControllerPlugin,
+            HudPlugin,
+            AssetLoaderPlugin,
+            BackgroundPlugin,
         ))
         //        .add_plugins(EditorPlugin::default())
         .init_resource::<SecondTimer>()
-        .add_systems(Startup, (load_assets, play_ost))
-        .add_systems(
-            Update,
-            (
-                load_gltf_enemy.run_if(in_state(GameState::AssetLoading)),
-                load_gltf_player.run_if(in_state(GameState::AssetLoading)),
-                check_if_loaded.run_if(in_state(GameState::AssetLoading)),
-            )
-                .chain(),
-        )
+        .add_systems(OnExit(GameState::AssetLoading), (add_background, add_ost))
         .add_systems(
             OnEnter(GameState::InGame),
-            (background_setup.before(setup), setup),
+            (setup, play_ost.after(background_setup)),
         )
         .add_systems(
             Update,
@@ -129,65 +101,10 @@ fn main() {
                 spawn_random_enemy.run_if(in_state(GameState::InGame)),
                 update_score.run_if(in_state(GameState::InGame)),
                 handle_collisions.run_if(in_state(GameState::InGame)),
-                move_background.run_if(in_state(GameState::InGame)),
                 despawn_nonvisible_enemies.run_if(in_state(GameState::InGame)),
             ),
         )
         .run();
-}
-
-fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
-    let run: Handle<Gltf> = server.load("run.glb");
-    let amarillo: Handle<Gltf> = server.load("frijol_amarillo.glb");
-    let rojo: Handle<Gltf> = server.load("frijol_rojo.glb");
-    let background: Handle<Image> = server.load("Background.png");
-    commands.insert_resource(AssetPackPlayer(run));
-    commands.insert_resource(AssetPackEnemy { rojo, amarillo });
-    commands.insert_resource(BackgroundImg(background));
-}
-
-fn load_gltf_player(
-    mut commands: Commands,
-    my: Res<AssetPackPlayer>,
-    assets_gltf: Res<Assets<Gltf>>,
-) {
-    if let Some(gltf) = assets_gltf.get(&my.0) {
-        commands.insert_resource(PlayerModel(gltf.scenes[0].clone()));
-        commands.insert_resource(Animations(gltf.animations.clone()));
-    }
-}
-
-fn load_gltf_enemy(
-    mut commands: Commands,
-    my: Res<AssetPackEnemy>,
-    assets_gltf: Res<Assets<Gltf>>,
-) {
-    if let Some(gltf_rojo) = assets_gltf.get(&my.rojo) {
-        if let Some(gltf_amarillo) = assets_gltf.get(&my.amarillo) {
-            commands.insert_resource(EnemyModel {
-                rojo: gltf_rojo.scenes[0].clone(),
-                amarillo: gltf_amarillo.scenes[0].clone(),
-            });
-        }
-    }
-}
-
-fn check_if_loaded(
-    player: Res<AssetPackPlayer>,
-    enemy: Res<AssetPackEnemy>,
-    background: Res<BackgroundImg>,
-    assets_gltf: Res<Assets<Gltf>>,
-    assets_img: Res<Assets<Image>>,
-    mut next_state: ResMut<NextState<GameState>>,
-) {
-    let player_loaded = assets_gltf.get(&player.0).is_some();
-    let enemy_loaded = assets_gltf.get(&enemy.rojo).is_some();
-    let image_loaded = assets_img.get(&background.0).is_some();
-    let enemy_loaded = enemy_loaded && assets_gltf.get(&enemy.amarillo).is_some();
-
-    if player_loaded && enemy_loaded && image_loaded {
-        next_state.set(GameState::InGame);
-    }
 }
 
 fn setup(
@@ -409,12 +326,10 @@ fn setup_scene_once_loaded(
     }
 }
 
-fn play_ost(asset_server: Res<AssetServer>, mut commands: Commands) {
-    commands.spawn(AudioBundle {
-        source: asset_server.load("ost.flac"),
-        settings: PlaybackSettings {
-            mode: PlaybackMode::Loop,
-            ..default()
-        },
-    });
+fn add_background(mut commands: Commands, asset_background: Res<AssetBackground>) {
+    commands.insert_resource(BackgroundImg(asset_background.0.clone()));
+}
+
+fn add_ost(mut commands: Commands, asset_ost: Res<AssetOST>) {
+    commands.insert_resource(OST(asset_ost.0.clone()));
 }

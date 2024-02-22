@@ -1,9 +1,8 @@
 use crate::constants;
+use crate::*;
 use bevy::prelude::*;
 use bevy::render::camera::ScalingMode;
 use itertools::Itertools;
-
-use crate::BackgroundImg;
 
 #[derive(Component)]
 pub struct Velocity(f32);
@@ -11,7 +10,22 @@ pub struct Velocity(f32);
 #[derive(Component)]
 pub struct Background;
 
-pub fn initialize_background(mut commands: Commands, texture: Handle<Image>, velocity: Velocity) {
+#[derive(Resource)]
+pub struct BackgroundImg(pub Handle<Image>);
+
+pub struct BackgroundPlugin;
+
+impl Plugin for BackgroundPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            OnEnter(GameState::InGame),
+            (background_setup.before(setup),),
+        )
+        .add_systems(Update, move_background.run_if(in_state(GameState::InGame)));
+    }
+}
+
+pub fn initialize_background(commands: &mut Commands, texture: Handle<Image>, velocity: Velocity) {
     let sprite = |transform| SpriteBundle {
         sprite: Sprite {
             custom_size: Some(Vec2::new(constants::WIDTH, constants::HEIGHT)),
@@ -50,7 +64,7 @@ pub fn background_setup(mut commands: Commands, images: Res<BackgroundImg>) {
         transform: Transform::from_xyz(0., 0., 1.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
-    initialize_background(commands, images.0.clone(), Velocity(2.0));
+    initialize_background(&mut commands, images.0.clone(), Velocity(2.0));
 }
 
 pub fn move_background(
